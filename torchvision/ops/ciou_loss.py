@@ -47,7 +47,7 @@ def complete_box_iou_loss(
     boxes1 = _upcast_non_float(boxes1)
     boxes2 = _upcast_non_float(boxes2)
 
-    diou_loss, iou = _diou_iou_loss(boxes1, boxes2)
+    diou_loss, iou = _diou_iou_loss(boxes1, boxes2, eps=eps)
 
     x1, y1, x2, y2 = boxes1.unbind(dim=-1)
     x1g, y1g, x2g, y2g = boxes2.unbind(dim=-1)
@@ -57,7 +57,9 @@ def complete_box_iou_loss(
     h_pred = y2 - y1
     w_gt = x2g - x1g
     h_gt = y2g - y1g
-    v = (4 / (torch.pi**2)) * torch.pow((torch.atan(w_gt / h_gt) - torch.atan(w_pred / h_pred)), 2)
+    v = (4 / (torch.pi**2)) * torch.pow(
+        torch.atan2(w_gt, h_gt) - torch.atan2(w_pred, h_pred), 2
+    )
     with torch.no_grad():
         alpha = v / (1 - iou + v + eps)
 

@@ -1939,6 +1939,21 @@ class TestCompleteBoxIou(TestIouBase):
     def test_iou_batch(self):
         self._run_batch_test(ops.complete_box_iou)
 
+    @pytest.mark.parametrize(
+        "degenerate_box",
+        [
+            [10.0, 80.0, 50.0, 80.0],  # zero height
+            [10.0, 20.0, 10.0, 80.0],  # zero width
+            [10.0, 80.0, 10.0, 80.0],  # point box
+        ],
+    )
+    @pytest.mark.parametrize("dtype", [torch.float32, torch.float64, torch.half])
+    def test_iou_degenerate_boxes(self, degenerate_box, dtype):
+        boxes1 = torch.tensor([degenerate_box], dtype=dtype)
+        boxes2 = torch.tensor([[10.0, 20.0, 50.0, 80.0]], dtype=dtype)
+        iou = ops.complete_box_iou(boxes1, boxes2)
+        assert torch.isfinite(iou).all()
+
 
 class TestRotatedBoxIou:
     @pytest.mark.skip(reason="Flaky due to numerical instability of the IoU kernel for near-identical boxes")
@@ -2313,6 +2328,25 @@ class TestCompleteBoxIouLoss:
     @pytest.mark.parametrize("dtype", [torch.float32, torch.half])
     def test_empty_inputs(self, dtype, device):
         assert_empty_loss(ops.complete_box_iou_loss, dtype, device)
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("dtype", [torch.float32, torch.float64, torch.half])
+    @pytest.mark.parametrize(
+        "degenerate_box",
+        [
+            [10.0, 80.0, 50.0, 80.0],  # zero height
+            [10.0, 20.0, 10.0, 80.0],  # zero width
+            [10.0, 80.0, 10.0, 80.0],  # point box
+        ],
+    )
+    def test_ciou_loss_degenerate_boxes(self, dtype, device, degenerate_box):
+        pred = torch.tensor([degenerate_box], dtype=dtype, device=device, requires_grad=True)
+        target = torch.tensor([[10.0, 20.0, 50.0, 80.0]], dtype=dtype, device=device)
+        loss = ops.complete_box_iou_loss(pred, target, reduction="sum")
+        assert torch.isfinite(loss)
+        loss.backward()
+        assert pred.grad is not None
+        assert torch.isfinite(pred.grad).all()
 
 
 class TestDistanceBoxIouLoss:
